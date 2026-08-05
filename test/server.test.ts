@@ -3,7 +3,13 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppConfig } from '../src/config.js'
 import { createServer } from '../src/server.js'
-import type { GeminiService, Modality, ServiceResult, UnderstandingRequest } from '../src/service.js'
+import type {
+  GeminiService,
+  LocalFileRequest,
+  Modality,
+  RemoteFileRequest,
+  ServiceResult,
+} from '../src/service.js'
 
 const config: AppConfig = {
   apiKey: 'test-key',
@@ -16,8 +22,12 @@ class FakeService implements GeminiService {
     return { text: `web:${prompt}`, interactionId: 'web-id' }
   }
 
-  async understand(modality: Modality, request: UnderstandingRequest): Promise<ServiceResult> {
-    return { text: `${modality}:${request.source}:${request.prompt}`, interactionId: 'media-id' }
+  async understandRemote(modality: Modality, request: RemoteFileRequest): Promise<ServiceResult> {
+    return { text: `remote:${modality}:${request.url}:${request.prompt}`, interactionId: 'remote-id' }
+  }
+
+  async understandLocal(modality: Modality, request: LocalFileRequest): Promise<ServiceResult> {
+    return { text: `local:${modality}:${request.path}:${request.prompt}`, interactionId: 'local-id' }
   }
 }
 
@@ -28,7 +38,7 @@ afterEach(async () => {
 })
 
 describe('MCP surface', () => {
-  it('exposes exactly the five simple tool names', async () => {
+  it('exposes exactly the three independent tool names', async () => {
     const server = createServer(new FakeService(), config)
     const client = new Client({ name: 'test-client', version: '1.0.0' })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -37,10 +47,19 @@ describe('MCP surface', () => {
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
     const result = await client.listTools()
 
-    expect(result.tools.map((tool) => tool.name).sort()).toEqual(['audio', 'document', 'image', 'video', 'web'])
+    expect(result.tools.map((tool) => tool.name).sort()).toEqual(['local_file', 'remote_file', 'web'])
+    expect(client.getInstructions()).toContain('intended for one-shot use')
+
+    const descriptions = Object.fromEntries(result.tools.map((tool) => [tool.name, tool.description ?? '']))
+    expect(descriptions.web).not.toContain('remote_file')
+    expect(descriptions.web).not.toContain('local_file')
+    expect(descriptions.remote_file).not.toContain('web')
+    expect(descriptions.remote_file).not.toContain('local_file')
+    expect(descriptions.local_file).not.toContain('web')
+    expect(descriptions.local_file).not.toContain('remote_file')
   })
 
-  it('returns Gemini text directly from a tool call', async () => {
+  it('routes a declared remote modality without classifying the URL', async () => {
     const server = createServer(new FakeService(), config)
     const client = new Client({ name: 'test-client', version: '1.0.0' })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
@@ -48,9 +67,10 @@ describe('MCP surface', () => {
 
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
     const result = await client.callTool({
-      name: 'video',
+      name: 'remote_file',
       arguments: {
-        source: 'https://www.youtube.com/watch?v=abc',
+        url: 'https://www.youtube.com/watch?v=abc',
+        type: 'video',
         prompt: 'Summarize it',
       },
     })
@@ -58,8 +78,50 @@ describe('MCP surface', () => {
     expect(result.content).toEqual([
       {
         type: 'text',
-        text: 'video:https://www.youtube.com/watch?v=abc:Summarize it',
+        text: 'remote:video:https://www.youtube.com/watch?v=abc:Summarize it',
       },
     ])
+  })
+
+  it('routes a declared local modality through the local-file path', async () => {
+    const server = createServer(new FakeService(), config)
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    closeables.push(client, server)
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+    const result = await client.callTool({
+      name: 'local_file',
+      arguments: {
+        path: '/workspace/report.pdf',
+        type: 'document',
+        prompt: 'Summarize it',
+      },
+    })
+
+    expect(result.content).toEqual([
+      {
+        type: 'text',
+        text: 'local:document:/workspace/report.pdf:Summarize it',
+      },
+    ])
+  })
+
+  it('requires an explicit file type', async () => {
+    const server = createServer(new FakeService(), config)
+    const client = new Client({ name: 'test-client', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    closeables.push(client, server)
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+    const result = await client.callTool({
+      name: 'remote_file',
+      arguments: {
+        url: 'https://example.com/report.pdf',
+        prompt: 'Summarize it',
+      },
+    })
+
+    expect(result.isError).toBe(true)
   })
 })

@@ -1,81 +1,109 @@
 # gemini-understanding
 
-A deliberately small MCP server exposing Gemini's web and multimodal understanding through five tools:
+A minimal MCP server for one-shot Gemini requests. Each tool call sends one prompt and at most one source, returns one answer, and does not link calls into a continuing conversation.
+
+The server exposes three independent tools:
 
 - `web`
-- `video`
-- `audio`
-- `document`
-- `image`
+- `remote_file`
+- `local_file`
 
-The server uses the Gemini Interactions API. It does not inspect content to guess its modality. The calling agent chooses the tool, and Gemini returns the provider-side error when a modality, MIME type, URL, model, or thinking-level combination is invalid.
+Clients and MCP gateways may expose any subset of the tools. This is useful for remote or isolated deployments where filesystem access is unavailable or undesirable: `local_file` can be hidden without changing the contract of the remaining tools.
 
-## Tool behavior
+## `web`
 
-### `web`
+Performs one-shot web research with both Gemini server tools enabled:
+
+- Google Search
+- URL Context
 
 Input:
 
 ```json
 {
-  "prompt": "Research the latest development and also read https://example.com/page"
+  "prompt": "Research the topic and read https://example.com/page"
 }
 ```
 
-Both Gemini server tools are enabled on every call:
+Ordinary webpage URLs may be included directly in the prompt.
 
-- Google Search
-- URL Context
+## `remote_file`
 
-Use this for general web research and ordinary webpages. Use one of the typed tools for direct media/file URLs.
+Analyzes one public HTTP(S) file URL. The caller must declare the source type; the server does not inspect the URL or reclassify the source.
 
-### `video`, `audio`, `document`, and `image`
-
-All four tools share this input:
+Input:
 
 ```json
 {
-  "source": "a local path or public HTTP(S) URL",
-  "prompt": "What should Gemini do with it?",
-  "mimeType": "optional MIME type hint"
+  "url": "https://example.com/report.pdf",
+  "type": "document",
+  "prompt": "Summarize the conclusions",
+  "mimeType": "application/pdf"
 }
 ```
+
+`type` is required and must be one of:
+
+- `image`
+- `video`
+- `audio`
+- `document`
+
+`mimeType` is optional, but it is preferred for direct remote files when known because origin servers may return missing, generic, malformed, or parameterized MIME metadata. Public YouTube URLs are supplied with `type: "video"` and normally omit `mimeType`.
 
 Examples:
 
 ```json
 {
-  "source": "https://www.youtube.com/watch?v=...",
+  "url": "https://www.youtube.com/watch?v=...",
+  "type": "video",
   "prompt": "Summarize this video"
 }
 ```
 
 ```json
 {
-  "source": "https://example.com/video.mp4",
-  "prompt": "Describe the video",
-  "mimeType": "video/mp4"
+  "url": "https://example.com/audio.mp3",
+  "type": "audio",
+  "prompt": "Transcribe the speech",
+  "mimeType": "audio/mpeg"
 }
 ```
 
+The URL is passed directly to Gemini as a typed URI. The server performs no HTTP header probing, MIME sniffing, extension-based routing, downloading, conversion, or cross-type fallback.
+
+## `local_file`
+
+Analyzes one file available on the MCP server filesystem. The caller must declare the source type; the server does not inspect the content or reclassify the source.
+
+Input:
+
 ```json
 {
-  "source": "/workspace/report.pdf",
+  "path": "/workspace/report.pdf",
+  "type": "document",
   "prompt": "Summarize the conclusions"
 }
 ```
 
-For remote sources, the URL is passed directly as a typed Gemini URI. YouTube is handled by calling `video` and normally omitting `mimeType`.
+`type` is required and must be one of:
 
-For local sources, the server:
+- `image`
+- `video`
+- `audio`
+- `document`
 
-1. resolves the path relative to the MCP server's working directory;
-2. uploads it with the Gemini Files API;
-3. waits for processing;
-4. sends the uploaded URI as the caller-selected modality;
+`mimeType` is optional. The Gemini SDK normally infers it from a recognized file extension. It may be supplied as an override when inference is unavailable or incorrect.
+
+The server:
+
+1. resolves relative paths against its working directory;
+2. uploads the file through the Gemini Files API;
+3. waits until processing is complete;
+4. sends the uploaded URI using the declared source type;
 5. deletes the temporary upload.
 
-The SDK infers local MIME types from file extensions when possible. The server performs no MIME sniffing, URL header probing, extension-based modality routing, or automatic fallback to another tool.
+The path refers to the filesystem visible to the MCP server process. In a remote, containerized, or isolated deployment, it does not refer to the MCP client's filesystem unless that storage is explicitly mounted or shared.
 
 ## Configuration
 
@@ -119,8 +147,10 @@ Run the stdio server:
 GEMINI_API_KEY=YOUR_KEY npm start
 ```
 
+The stdio implementation can also be placed behind an MCP gateway that exposes it through Streamable HTTP. Tool filtering remains a client or gateway concern.
+
 ## Error behavior
 
-The server does not silently correct or reroute failed requests. Tool errors include the tool name, processing stage, configured model, thinking level, source where applicable, and the original Gemini status/code/message when available.
+The server does not silently correct or reroute failed requests. Tool errors include the tool name, processing stage, configured model, thinking level, source, and the original Gemini status, code, and message when available.
 
-Local paths that do not exist fail at the filesystem stage because no API request can be constructed. Temporary-upload cleanup failures are non-fatal and are reported as warnings.
+A nonexistent server-side path fails at the filesystem stage because no API request can be constructed. Temporary-upload cleanup failures are non-fatal and are reported as warnings.

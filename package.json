@@ -1,7 +1,7 @@
 {
   "name": "@sandlong/gemini-understanding",
-  "version": "0.1.0",
-  "description": "A minimal MCP server for Gemini web and multimodal understanding.",
+  "version": "0.2.0",
+  "description": "A minimal one-shot MCP server for Gemini web and file understanding.",
   "type": "module",
   "bin": {
     "gemini-understanding": "dist/index.js"

@@ -1,13 +1,18 @@
 import { GoogleGenAI, type File, type Interactions } from '@google/genai'
 import type { AppConfig } from './config.js'
 import { StageError } from './errors.js'
-import { isRemoteSource } from './source.js'
 import { deleteUploadedFile, uploadLocalFile } from './uploads.js'
 
 export type Modality = 'video' | 'audio' | 'document' | 'image'
 
-export interface UnderstandingRequest {
-  source: string
+export interface RemoteFileRequest {
+  url: string
+  prompt: string
+  mimeType?: string
+}
+
+export interface LocalFileRequest {
+  path: string
   prompt: string
   mimeType?: string
 }
@@ -20,7 +25,8 @@ export interface ServiceResult {
 
 export interface GeminiService {
   web(prompt: string): Promise<ServiceResult>
-  understand(modality: Modality, request: UnderstandingRequest): Promise<ServiceResult>
+  understandRemote(modality: Modality, request: RemoteFileRequest): Promise<ServiceResult>
+  understandLocal(modality: Modality, request: LocalFileRequest): Promise<ServiceResult>
 }
 
 export function buildMediaContent(
@@ -51,6 +57,7 @@ export class GoogleGeminiService implements GeminiService {
       const interaction = await this.client.interactions.create({
         model: this.config.model,
         input: prompt,
+        store: false,
         tools: [{ type: 'google_search' }, { type: 'url_context' }],
         generation_config: {
           thinking_level: this.config.thinkingLevel,
@@ -66,18 +73,18 @@ export class GoogleGeminiService implements GeminiService {
     }
   }
 
-  async understand(modality: Modality, request: UnderstandingRequest): Promise<ServiceResult> {
-    if (isRemoteSource(request.source)) {
-      return this.createUnderstandingInteraction(modality, request.source, request.prompt, request.mimeType)
-    }
+  async understandRemote(modality: Modality, request: RemoteFileRequest): Promise<ServiceResult> {
+    return this.createUnderstandingInteraction(modality, request.url, request.prompt, request.mimeType)
+  }
 
+  async understandLocal(modality: Modality, request: LocalFileRequest): Promise<ServiceResult> {
     let uploaded: File | undefined
     let warning: string | undefined
     let result: ServiceResult | undefined
     let primaryError: unknown
 
     try {
-      uploaded = await uploadLocalFile(this.client, request.source, request.mimeType)
+      uploaded = await uploadLocalFile(this.client, request.path, request.mimeType)
       if (!uploaded.uri) {
         throw new StageError('processing', new Error('Uploaded Gemini file has no URI'))
       }
@@ -121,6 +128,7 @@ export class GoogleGeminiService implements GeminiService {
       const interaction = await this.client.interactions.create({
         model: this.config.model,
         input: [buildMediaContent(modality, uri, mimeType), { type: 'text', text: prompt }],
+        store: false,
         generation_config: {
           thinking_level: this.config.thinkingLevel,
         },
