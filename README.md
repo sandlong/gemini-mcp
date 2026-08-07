@@ -109,8 +109,15 @@ The path refers to the filesystem visible to the MCP server process. In a remote
 
 ```text
 GEMINI_API_KEY          required
+GEMINI_BASE_URL         optional; default: official Google Gemini API endpoint
 GEMINI_MODEL            default: gemini-3.5-flash-lite
 GEMINI_THINKING_LEVEL   default: high
+```
+
+`GEMINI_BASE_URL` replaces the Gemini API base URL used by the Google Gen AI SDK. Leave it unset to use Google's official endpoint. This is useful with compatible reverse proxies or API gateways, for example:
+
+```text
+GEMINI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/google-ai-studio
 ```
 
 Custom model and thinking-level strings are passed through without compatibility validation.
@@ -128,6 +135,7 @@ With explicit optional settings:
 ```bash
 claude mcp add gemini-understanding -s user -- \
   env GEMINI_API_KEY=YOUR_KEY \
+      GEMINI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/google-ai-studio \
       GEMINI_MODEL=gemini-3.5-flash-lite \
       GEMINI_THINKING_LEVEL=high \
   npx -y github:sandlong/gemini-understanding

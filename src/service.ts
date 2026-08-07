@@ -47,7 +47,13 @@ export class GoogleGeminiService implements GeminiService {
   readonly client: GoogleGenAI
   readonly config: AppConfig
 
-  constructor(config: AppConfig, client: GoogleGenAI = new GoogleGenAI({ apiKey: config.apiKey })) {
+  constructor(
+    config: AppConfig,
+    client: GoogleGenAI = new GoogleGenAI({
+      apiKey: config.apiKey,
+      ...(config.baseUrl ? { httpOptions: { baseUrl: config.baseUrl } } : {}),
+    }),
+  ) {
     this.config = config
     this.client = client
   }
