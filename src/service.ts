@@ -38,6 +38,7 @@ export function buildMediaContent(
     type: modality,
     uri,
     ...(mimeType ? { mime_type: mimeType } : {}),
+    ...(modality === 'video' ? { processing: 'agentic' } : {}),
   }
 
   return common as Interactions.Content

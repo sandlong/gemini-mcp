@@ -61,6 +61,8 @@ Examples:
 }
 ```
 
+Video understanding always uses Gemini agentic video processing and requires Gemini 3.5 Flash Lite or newer. Older models are not supported for video requests.
+
 ```json
 {
   "url": "https://example.com/audio.mp3",

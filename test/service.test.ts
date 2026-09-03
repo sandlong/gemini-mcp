@@ -6,6 +6,7 @@ describe('typed Gemini media inputs', () => {
     expect(buildMediaContent('video', 'https://www.youtube.com/watch?v=abc')).toEqual({
       type: 'video',
       uri: 'https://www.youtube.com/watch?v=abc',
+      processing: 'agentic',
     })
   })
 
