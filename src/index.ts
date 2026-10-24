@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport()
 
   await server.connect(transport)
-  console.error(`gemini-understanding running on stdio with model ${config.model}`)
+  console.error(`Gemini MCP running on stdio with model ${config.model}`)
 }
 
 main().catch((error) => {

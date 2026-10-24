@@ -1,4 +1,4 @@
-# gemini-understanding
+# Gemini MCP
 
 A minimal MCP server for one-shot Gemini requests. Each tool call sends one prompt and at most one source, returns one answer, and does not link calls into a continuing conversation.
 
@@ -127,20 +127,20 @@ Custom model and thinking-level strings are passed through without compatibility
 ## Install from GitHub
 
 ```bash
-claude mcp add gemini-understanding -s user -- \
+claude mcp add gemini-mcp -s user -- \
   env GEMINI_API_KEY=YOUR_KEY \
-  npx -y github:sandlong/gemini-understanding
+  npx -y github:sandlong/gemini-mcp
 ```
 
 With explicit optional settings:
 
 ```bash
-claude mcp add gemini-understanding -s user -- \
+claude mcp add gemini-mcp -s user -- \
   env GEMINI_API_KEY=YOUR_KEY \
       GEMINI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/google-ai-studio \
       GEMINI_MODEL=gemini-3.5-flash-lite \
       GEMINI_THINKING_LEVEL=high \
-  npx -y github:sandlong/gemini-understanding
+  npx -y github:sandlong/gemini-mcp
 ```
 
 ## Local development

@@ -1,10 +1,10 @@
 {
-  "name": "@sandlong/gemini-understanding",
+  "name": "@sandlong/gemini-mcp",
   "version": "0.2.0",
   "description": "A minimal one-shot MCP server for Gemini web and file understanding.",
   "type": "module",
   "bin": {
-    "gemini-understanding": "dist/index.js"
+    "gemini-mcp": "dist/index.js"
   },
   "files": [
     "dist",

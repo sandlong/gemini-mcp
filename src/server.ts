@@ -68,7 +68,8 @@ function successResult(result: ServiceResult, model: string, thinkingLevel: stri
 export function createServer(service: GeminiService, config: AppConfig): McpServer {
   const server = new McpServer(
     {
-      name: 'gemini-understanding',
+      name: 'gemini-mcp',
+      title: 'Gemini MCP',
       version: '0.2.0',
     },
     {
